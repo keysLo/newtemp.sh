@@ -29,12 +29,14 @@ export URL_PREFIX=                   # （可选）自定义完整链接前缀�
 cargo run
 ```
 
+启动后可直接在浏览器打开根路径（如 `http://localhost:8080/`）使用内置上传页面，输入配置的上传密码即可完成上传。
+
 ## 上传示例
 
 使用 `curl` 的 multipart 上传：
 
 ```bash
-curl -F "file=@/path/to/file" http://localhost:8080/upload
+curl -F "password=changeme" -F "file=@/path/to/file" http://localhost:8080/upload
 ```
 
 响应示例：
