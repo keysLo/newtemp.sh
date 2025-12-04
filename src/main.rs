@@ -5,8 +5,10 @@ use std::{
     net::SocketAddr,
     path::{Path as FsPath, PathBuf},
     sync::Arc,
-    time::{Duration, Instant},
+    time::Instant,
 };
+
+mod config;
 
 use axum::{
     Json, Router,
@@ -21,6 +23,8 @@ use thiserror::Error;
 use tokio::{fs, sync::Mutex, time::interval};
 use tracing::{error, info, warn};
 use uuid::Uuid;
+
+use crate::config::{AppConfig, load_env_file};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
