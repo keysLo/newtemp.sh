@@ -2,10 +2,12 @@ use std::{
     collections::HashMap,
     env,
     net::SocketAddr,
-    path::{Path, PathBuf},
+    path::{Path as FsPath, PathBuf},
     sync::Arc,
-    time::{Duration, Instant},
+    time::Instant,
 };
+
+mod config;
 
 use axum::{
     Json, Router,
@@ -19,6 +21,8 @@ use thiserror::Error;
 use tokio::{fs, sync::Mutex, time::interval};
 use tracing::{error, info, warn};
 use uuid::Uuid;
+
+use crate::config::{AppConfig, load_env_file};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -46,15 +50,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("listening on {}", addr);
     axum::serve(listener, app).await?;
-    let addr: SocketAddr = env
-        .var("ADDRESS")
-        .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
-        .parse()?;
-
-    info!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
 
     Ok(())
 }
@@ -79,49 +74,6 @@ impl AppState {
             entries: Mutex::new(HashMap::new()),
             config,
         }
-    }
-}
-
-#[derive(Clone)]
-struct AppConfig {
-    storage_dir: PathBuf,
-    ttl: Duration,
-    cleanup_interval: Duration,
-    max_downloads: u32,
-}
-
-impl AppConfig {
-    fn from_env() -> Result<Self, AppError> {
-        let storage_dir = env
-            .var("STORAGE_DIR")
-            .unwrap_or_else(|_| "data".to_string());
-
-        let ttl = env
-            .var("DEFAULT_TTL_SECS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .map(Duration::from_secs)
-            .unwrap_or_else(|| Duration::from_secs(3600));
-
-        let cleanup_interval = env
-            .var("CLEANUP_INTERVAL_SECS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .map(Duration::from_secs)
-            .unwrap_or_else(|| Duration::from_secs(60));
-
-        let max_downloads = env
-            .var("MAX_DOWNLOADS")
-            .ok()
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(3);
-
-        Ok(Self {
-            storage_dir: PathBuf::from(storage_dir),
-            ttl,
-            cleanup_interval,
-            max_downloads,
-        })
     }
 }
 
@@ -161,7 +113,7 @@ impl IntoResponse for AppError {
 #[derive(Serialize)]
 struct UploadResponse {
     url: String,
-    expires_in_seconds: u64,
+    expires_in_minutes: u64,
     remaining_downloads: u32,
 }
 
@@ -198,7 +150,7 @@ async fn upload(
 
         let response = UploadResponse {
             url: format!("/d/{}", id),
-            expires_in_seconds: state.config.ttl.as_secs(),
+            expires_in_minutes: state.config.ttl.as_secs() / 60,
             remaining_downloads: state.config.max_downloads,
         };
 
@@ -288,7 +240,7 @@ async fn purge_expired(state: &Arc<AppState>) {
     }
 }
 
-async fn delete_file(path: &Path) {
+async fn delete_file(path: &FsPath) {
     if let Err(err) = fs::remove_file(path).await {
         if err.kind() != std::io::ErrorKind::NotFound {
             warn!(%err, "failed to remove file {:?}", path);
