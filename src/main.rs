@@ -9,8 +9,9 @@ mod config;
 
 use axum::{
     Json, Router,
-    extract::multipart::MultipartError,
-    extract::{Multipart, Path, State},
+    extract::{
+        multipart::MultipartError, DefaultBodyLimit, Multipart, Path, State,
+    },
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
@@ -27,7 +28,10 @@ use crate::config::{AppConfig, load_env_file};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
         .init();
 
     load_env_file();
@@ -38,10 +42,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState::new(config.clone()));
     spawn_cleanup(state.clone());
 
+    let upload_limit = DefaultBodyLimit::max(config.max_upload_bytes);
+
     let app = Router::new()
         .route("/upload", post(upload))
         .route("/", get(upload_page))
         .route("/d/:id", get(download))
+        .layer(upload_limit)
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(config.address).await?;

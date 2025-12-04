@@ -33,11 +33,14 @@ export UPLOAD_PAGE_ENABLED=true      # （默认 true）是否启用内置上传
 export UPLOAD_PASSWORD=changeme      # 上传密码（上传页面与 /upload 接口均需携带）
 export USE_FILENAME_SUFFIX=true      # （默认 true）下载链接是否携带源文件后缀（如 .png），设为 false 可禁用
 export UPLOAD_DEBUG_LOGS=false       # （默认 false）上传端点的解析/错误日志是否附带详细信息，定位浏览器上传问题时可开启
+export MAX_UPLOAD_GB=1               # 最大上传文件大小（GB，默认 1GB）
 
 cargo run
 ```
 
 启动后可直接在浏览器打开根路径（如 `http://localhost:8080/`）使用内置上传页面，输入配置的上传密码即可完成上传。
+
+默认日志等级为 info，如需查看更多调试信息可以设置 `RUST_LOG=debug`，并在排查浏览器上传问题时打开 `UPLOAD_DEBUG_LOGS=true` 以打印 multipart 解析详情。
 
 ## 上传示例
 

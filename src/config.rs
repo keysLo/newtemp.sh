@@ -17,6 +17,7 @@ pub struct AppConfig {
     pub upload_password: String,
     pub use_filename_suffix: bool,
     pub upload_debug_logs: bool,
+    pub max_upload_bytes: usize,
 }
 
 impl AppConfig {
@@ -67,6 +68,12 @@ impl AppConfig {
             .map(|v| v.eq_ignore_ascii_case("true"))
             .unwrap_or(false);
 
+        let max_upload_bytes = env::var("MAX_UPLOAD_GB")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .map(|gb| gb.saturating_mul(1024 * 1024 * 1024))
+            .unwrap_or(1024 * 1024 * 1024) as usize;
+
         Ok(Self {
             address: address.parse().unwrap_or_else(|err| {
                 warn!(%err, "invalid ADDRESS value, falling back to default");
@@ -81,6 +88,7 @@ impl AppConfig {
             upload_password,
             use_filename_suffix,
             upload_debug_logs,
+            max_upload_bytes,
         })
     }
 
