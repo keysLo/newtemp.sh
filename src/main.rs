@@ -1,8 +1,5 @@
 use std::{
     collections::HashMap,
-    env,
-    io::ErrorKind,
-    net::SocketAddr,
     path::{Path as FsPath, PathBuf},
     sync::Arc,
     time::Instant,
@@ -17,7 +14,6 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use dotenvy::dotenv;
 use serde::Serialize;
 use thiserror::Error;
 use tokio::{fs, sync::Mutex, time::interval};
@@ -72,48 +68,6 @@ impl AppState {
             entries: Mutex::new(HashMap::new()),
             config,
         }
-    }
-}
-
-#[derive(Clone)]
-struct AppConfig {
-    storage_dir: PathBuf,
-    ttl: Duration,
-    cleanup_interval: Duration,
-    max_downloads: u32,
-}
-
-impl AppConfig {
-    fn from_env() -> Result<Self, AppError> {
-        let storage_dir = env::var("STORAGE_DIR").unwrap_or_else(|_| "data".to_string());
-
-        let ttl = env
-            .var("DEFAULT_TTL_MINS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .map(|minutes| minutes.saturating_mul(60))
-            .map(Duration::from_secs)
-            .unwrap_or_else(|| Duration::from_secs(60 * 60));
-
-        let cleanup_interval = env
-            .var("CLEANUP_INTERVAL_MINS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .map(|minutes| minutes.saturating_mul(60))
-            .map(Duration::from_secs)
-            .unwrap_or_else(|| Duration::from_secs(60));
-
-        let max_downloads = env::var("MAX_DOWNLOADS")
-            .ok()
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(3);
-
-        Ok(Self {
-            storage_dir: PathBuf::from(storage_dir),
-            ttl,
-            cleanup_interval,
-            max_downloads,
-        })
     }
 }
 
@@ -250,14 +204,6 @@ async fn download(
     }
 
     Ok((headers, body).into_response())
-}
-
-fn load_env_file() {
-    if let Err(err) = dotenv() {
-        if !matches!(err, dotenvy::Error::Io(ref io_err) if io_err.kind() == ErrorKind::NotFound) {
-            warn!(%err, "failed to load .env file");
-        }
-    }
 }
 
 fn spawn_cleanup(state: Arc<AppState>) {
