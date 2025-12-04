@@ -1,4 +1,4 @@
-use std::{env, io::ErrorKind, path::PathBuf, time::Duration};
+use std::{env, io::ErrorKind, net::SocketAddr, path::PathBuf, time::Duration};
 
 use dotenvy::dotenv;
 use tracing::warn;
@@ -7,6 +7,7 @@ use crate::AppError;
 
 #[derive(Clone)]
 pub struct AppConfig {
+    pub address: SocketAddr,
     pub storage_dir: PathBuf,
     pub ttl: Duration,
     pub cleanup_interval: Duration,
@@ -15,6 +16,8 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn from_env() -> Result<Self, AppError> {
+        let address = env::var("ADDRESS").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+
         let storage_dir = env::var("STORAGE_DIR").unwrap_or_else(|_| "data".to_string());
 
         let ttl = env::var("DEFAULT_TTL_MINS")
@@ -37,6 +40,10 @@ impl AppConfig {
             .unwrap_or(3);
 
         Ok(Self {
+            address: address.parse().unwrap_or_else(|err| {
+                warn!(%err, "invalid ADDRESS value, falling back to default");
+                SocketAddr::from(([0, 0, 0, 0], 8080))
+            }),
             storage_dir: PathBuf::from(storage_dir),
             ttl,
             cleanup_interval,
