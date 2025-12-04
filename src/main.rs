@@ -9,6 +9,7 @@ mod config;
 
 use axum::{
     Json, Router,
+    extract::multipart::MultipartError,
     extract::{Multipart, Path, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{Html, IntoResponse, Response},
@@ -81,8 +82,12 @@ enum AppError {
     NoFileProvided,
     #[error("invalid upload password")]
     Unauthorized,
-    #[error("multipart error: {0}")]
-    Multipart(#[from] axum::extract::multipart::MultipartError),
+    #[error("multipart error")]
+    Multipart {
+        #[source]
+        source: axum::extract::multipart::MultipartError,
+        debug_message: Option<String>,
+    },
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -99,9 +104,19 @@ impl IntoResponse for AppError {
             Self::Unauthorized => {
                 (StatusCode::UNAUTHORIZED, "invalid upload password").into_response()
             }
-            Self::Multipart(err) => {
-                warn!(%err, "multipart parsing error");
-                (StatusCode::BAD_REQUEST, "failed to parse upload").into_response()
+            Self::Multipart {
+                source,
+                debug_message,
+            } => {
+                match &debug_message {
+                    Some(detail) => warn!(%source, %detail, "multipart parsing error"),
+                    None => warn!(%source, "multipart parsing error"),
+                }
+                let body = debug_message
+                    .map(|detail| format!("failed to parse upload: {}", detail))
+                    .unwrap_or_else(|| "failed to parse upload".to_string());
+
+                (StatusCode::BAD_REQUEST, body).into_response()
             }
             Self::Io(err) => {
                 error!(%err, "io error");
@@ -125,10 +140,18 @@ async fn upload(
     let mut provided_password: Option<String> = None;
     let mut file_data: Option<(String, Option<String>, Bytes)> = None;
 
-    while let Some(field) = multipart.next_field().await? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|err| to_multipart_error(&state, err))?
+    {
         match field.name() {
             Some("password") => {
-                provided_password = field.text().await.ok();
+                let text = field
+                    .text()
+                    .await
+                    .map_err(|err| to_multipart_error(&state, err))?;
+                provided_password = Some(text);
             }
             Some("file") => {
                 let filename = field
@@ -136,7 +159,10 @@ async fn upload(
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| "upload.bin".to_string());
                 let content_type = field.content_type().map(|v| v.to_string());
-                let data = field.bytes().await?;
+                let data = field
+                    .bytes()
+                    .await
+                    .map_err(|err| to_multipart_error(&state, err))?;
                 file_data = Some((filename, content_type, data));
             }
             _ => {}
@@ -172,6 +198,15 @@ async fn upload(
     let path = state.config.storage_dir.join(&download_id);
     fs::write(&path, &data).await?;
 
+    if state.config.upload_debug_logs {
+        info!(
+            filename = %filename,
+            bytes = data.len(),
+            content_type = %content_type.clone().unwrap_or_default(),
+            "upload received"
+        );
+    }
+
     let expires_at = Instant::now() + state.config.ttl;
     let entry = FileEntry {
         path: path.clone(),
@@ -194,6 +229,14 @@ async fn upload(
     };
 
     Ok(Json(response))
+}
+
+fn to_multipart_error(state: &AppState, err: MultipartError) -> AppError {
+    let detail = state.config.upload_debug_logs.then(|| err.to_string());
+    AppError::Multipart {
+        source: err,
+        debug_message: detail,
+    }
 }
 
 async fn download(

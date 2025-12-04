@@ -18,6 +18,7 @@ URL_PREFIX=                   # （可选）自定义完整链接前缀，例如
 UPLOAD_PAGE_ENABLED=true      # （默认 true）是否启用内置上传页面
 UPLOAD_PASSWORD=changeme      # 上传密码（上传页面与 /upload 接口均需携带）
 USE_FILENAME_SUFFIX=true      # （默认 true）下载链接是否携带源文件后缀（如 .png），设为 false 可禁用
+UPLOAD_DEBUG_LOGS=false       # （默认 false）上传端点的解析/错误日志是否附带详细信息，定位浏览器上传问题时可开启
 MAX_UPLOAD_GB=1               # 最大上传文件大小（GB，默认 1GB）
 ENV
 ```bash
@@ -31,6 +32,7 @@ export URL_PREFIX=                   # （可选）自定义完整链接前缀�
 export UPLOAD_PAGE_ENABLED=true      # （默认 true）是否启用内置上传页面
 export UPLOAD_PASSWORD=changeme      # 上传密码（上传页面与 /upload 接口均需携带）
 export USE_FILENAME_SUFFIX=true      # （默认 true）下载链接是否携带源文件后缀（如 .png），设为 false 可禁用
+export UPLOAD_DEBUG_LOGS=false       # （默认 false）上传端点的解析/错误日志是否附带详细信息，定位浏览器上传问题时可开启
 
 cargo run
 ```

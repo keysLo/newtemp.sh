@@ -16,6 +16,7 @@ pub struct AppConfig {
     pub upload_page_enabled: bool,
     pub upload_password: String,
     pub use_filename_suffix: bool,
+    pub upload_debug_logs: bool,
 }
 
 impl AppConfig {
@@ -61,6 +62,11 @@ impl AppConfig {
             .map(|v| !v.eq_ignore_ascii_case("false"))
             .unwrap_or(true);
 
+        let upload_debug_logs = env::var("UPLOAD_DEBUG_LOGS")
+            .ok()
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
         Ok(Self {
             address: address.parse().unwrap_or_else(|err| {
                 warn!(%err, "invalid ADDRESS value, falling back to default");
@@ -74,6 +80,7 @@ impl AppConfig {
             upload_page_enabled,
             upload_password,
             use_filename_suffix,
+            upload_debug_logs,
         })
     }
 
