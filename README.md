@@ -5,6 +5,17 @@
 
 ## 运行
 
+运行前可以将环境变量写入配置文件（默认 `config.env`，通过 `CONFIG_FILE` 指定其他路径），启动时会自动加载：
+
+```bash
+cat > config.env <<'ENV'
+ADDRESS=0.0.0.0:8080          # 监听地址（默认 0.0.0.0:8080）
+STORAGE_DIR=./data            # 文件存储目录（默认 ./data）
+DEFAULT_TTL_SECS=3600         # 链接与文件默认保留时长（秒）
+CLEANUP_INTERVAL_SECS=60      # 清理过期文件的周期（秒）
+MAX_DOWNLOADS=3               # 每个链接最大访问次数（默认 3）
+MAX_UPLOAD_GB=1               # 最大上传文件大小（GB，默认 1GB）
+ENV
 ```bash
 # 可选：配置环境变量
 export ADDRESS=0.0.0.0:8080          # 监听地址（默认 0.0.0.0:8080）

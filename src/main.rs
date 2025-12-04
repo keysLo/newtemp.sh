@@ -26,6 +26,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
+    load_env_file();
+
     let config = AppConfig::from_env()?;
     fs::create_dir_all(&config.storage_dir).await?;
 
@@ -37,6 +39,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/d/:id", get(download))
         .with_state(state);
 
+    let addr: SocketAddr = env::var("ADDRESS")
+        .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
+        .parse()?;
+
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    info!("listening on {}", addr);
+    axum::serve(listener, app).await?;
     let addr: SocketAddr = env
         .var("ADDRESS")
         .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
