@@ -13,3 +13,4 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 thiserror = "1.0"
 dotenvy = "0.15"
+bytes = "1"
