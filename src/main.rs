@@ -11,9 +11,10 @@ use axum::{
     Json, Router,
     extract::{Multipart, Path, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
+use bytes::Bytes;
 use serde::Serialize;
 use thiserror::Error;
 use tokio::{fs, sync::Mutex, time::interval};
@@ -38,6 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .route("/upload", post(upload))
+        .route("/", get(upload_page))
         .route("/d/:id", get(download))
         .with_state(state);
 
@@ -77,6 +79,8 @@ enum AppError {
     NotFound,
     #[error("no file provided in multipart field 'file'")]
     NoFileProvided,
+    #[error("invalid upload password")]
+    Unauthorized,
     #[error("multipart error: {0}")]
     Multipart(#[from] axum::extract::multipart::MultipartError),
     #[error("io error: {0}")]
@@ -92,6 +96,9 @@ impl IntoResponse for AppError {
                 "expected multipart field named 'file'",
             )
                 .into_response(),
+            Self::Unauthorized => {
+                (StatusCode::UNAUTHORIZED, "invalid upload password").into_response()
+            }
             Self::Multipart(err) => {
                 warn!(%err, "multipart parsing error");
                 (StatusCode::BAD_REQUEST, "failed to parse upload").into_response()
@@ -115,43 +122,78 @@ async fn upload(
     State(state): State<Arc<AppState>>,
     mut multipart: Multipart,
 ) -> Result<Json<UploadResponse>, AppError> {
+    let mut provided_password: Option<String> = None;
+    let mut file_data: Option<(String, Option<String>, Bytes)> = None;
+
     while let Some(field) = multipart.next_field().await? {
-        if field.name() != Some("file") {
-            continue;
+        match field.name() {
+            Some("password") => {
+                provided_password = field.text().await.ok();
+            }
+            Some("file") => {
+                let filename = field
+                    .file_name()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "upload.bin".to_string());
+                let content_type = field.content_type().map(|v| v.to_string());
+                let data = field.bytes().await?;
+                file_data = Some((filename, content_type, data));
+            }
+            _ => {}
         }
-
-        let filename = field
-            .file_name()
-            .map(|v| v.to_string())
-            .unwrap_or_else(|| "upload.bin".to_string());
-        let content_type = field.content_type().map(|v| v.to_string());
-
-        let id = Uuid::new_v4().to_string();
-        let path = state.config.storage_dir.join(&id);
-        let data = field.bytes().await?;
-        fs::write(&path, &data).await?;
-
-        let expires_at = Instant::now() + state.config.ttl;
-        let entry = FileEntry {
-            path: path.clone(),
-            filename,
-            expires_at,
-            remaining_hits: state.config.max_downloads,
-            content_type,
-        };
-
-        state.entries.lock().await.insert(id.clone(), entry);
-
-        let response = UploadResponse {
-            url: format!("/d/{}", id),
-            expires_in_minutes: state.config.ttl.as_secs() / 60,
-            remaining_downloads: state.config.max_downloads,
-        };
-
-        return Ok(Json(response));
     }
 
-    Err(AppError::NoFileProvided)
+    if state.config.upload_page_enabled
+        && state.config.upload_password != provided_password.as_deref().unwrap_or("")
+    {
+        return Err(AppError::Unauthorized);
+    }
+
+    let Some((filename, content_type, data)) = file_data else {
+        return Err(AppError::NoFileProvided);
+    };
+
+    let id = Uuid::new_v4().to_string();
+    let suffix = if state.config.use_filename_suffix {
+        FsPath::new(&filename)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .filter(|ext| !ext.is_empty())
+            .map(|ext| format!(".{}", ext))
+    } else {
+        None
+    };
+
+    let download_id = suffix
+        .as_deref()
+        .map(|ext| format!("{}{}", id, ext))
+        .unwrap_or_else(|| id.clone());
+
+    let path = state.config.storage_dir.join(&download_id);
+    fs::write(&path, &data).await?;
+
+    let expires_at = Instant::now() + state.config.ttl;
+    let entry = FileEntry {
+        path: path.clone(),
+        filename,
+        expires_at,
+        remaining_hits: state.config.max_downloads,
+        content_type,
+    };
+
+    state
+        .entries
+        .lock()
+        .await
+        .insert(download_id.clone(), entry);
+
+    let response = UploadResponse {
+        url: state.config.build_download_url(&download_id),
+        expires_in_minutes: state.config.ttl.as_secs() / 60,
+        remaining_downloads: state.config.max_downloads,
+    };
+
+    Ok(Json(response))
 }
 
 async fn download(
@@ -240,4 +282,77 @@ async fn delete_file(path: &FsPath) {
             warn!(%err, "failed to remove file {:?}", path);
         }
     }
+}
+
+async fn upload_page(State(state): State<Arc<AppState>>) -> Response {
+    if !state.config.upload_page_enabled {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    let body = r#"<!doctype html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\" />
+  <title>newtemp.sh upload</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    label { display: block; margin: 0.5rem 0 0.25rem; }
+    input[type=\"password\"], button { font-size: 1rem; padding: 0.4rem 0.6rem; width: 100%; box-sizing: border-box; }
+    button { margin-top: 0.75rem; }
+    #file { display: none; }
+    #file-name { display: block; margin-top: 0.25rem; color: #555; word-break: break-all; }
+    pre { background: #f5f5f5; padding: 0.75rem; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Upload a file</h1>
+  <p>Select a file and enter the upload password to receive a download link.</p>
+  <form id=\"upload-form\">
+    <label for=\"password\">Upload password</label>
+    <input id=\"password\" name=\"password\" type=\"password\" required placeholder=\"Enter the upload password\" />
+    <label for=\"file\">Select file</label>
+    <input id=\"file\" name=\"file\" type=\"file\" required />
+    <button type=\"button\" id=\"file-button\">Choose file</button>
+    <span id=\"file-name\">No file chosen</span>
+    <button type=\"submit\">Upload</button>
+  </form>
+  <div id=\"result\"></div>
+  <script>
+    const form = document.getElementById('upload-form');
+    const result = document.getElementById('result');
+    const fileInput = document.getElementById('file');
+    const fileButton = document.getElementById('file-button');
+    const fileName = document.getElementById('file-name');
+
+    fileButton.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      fileName.textContent = fileInput.files[0]?.name || 'No file chosen';
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = fileInput.files[0];
+      const password = document.getElementById('password').value;
+      if (!file) {
+        result.textContent = 'Please choose a file first';
+        return;
+      }
+      const data = new FormData();
+      data.append('password', password);
+      data.append('file', file);
+      result.textContent = 'Uploading...';
+      try {
+        const response = await fetch('/upload', { method: 'POST', body: data });
+        const text = await response.text();
+        result.innerHTML = '<pre>' + text + '</pre>';
+      } catch (err) {
+        result.textContent = 'Upload failed: ' + err;
+      }
+    });
+  </script>
+</body>
+</html>
+"#;
+
+    Html(body).into_response()
 }
