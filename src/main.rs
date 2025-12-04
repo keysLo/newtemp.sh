@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = AppConfig::from_env()?;
     fs::create_dir_all(&config.storage_dir).await?;
 
-    let state = Arc::new(AppState::new(config));
+    let state = Arc::new(AppState::new(config.clone()));
     spawn_cleanup(state.clone());
 
     let app = Router::new()
@@ -45,12 +45,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/d/:id", get(download))
         .with_state(state);
 
-    let addr: SocketAddr = env::var("ADDRESS")
-        .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
-        .parse()?;
-
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    info!("listening on {}", addr);
+    let listener = tokio::net::TcpListener::bind(config.address).await?;
+    info!("listening on {}", config.address);
     axum::serve(listener, app).await?;
 
     Ok(())
