@@ -12,6 +12,11 @@ pub struct AppConfig {
     pub ttl: Duration,
     pub cleanup_interval: Duration,
     pub max_downloads: u32,
+    pub url_prefix: Option<String>,
+    pub upload_page_enabled: bool,
+    pub upload_password: String,
+    pub use_filename_suffix: bool,
+    pub upload_debug_logs: bool,
 }
 
 impl AppConfig {
@@ -39,6 +44,29 @@ impl AppConfig {
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(3);
 
+        let url_prefix = env::var("URL_PREFIX")
+            .ok()
+            .map(|prefix| prefix.trim_end_matches('/').to_string())
+            .filter(|prefix| !prefix.is_empty());
+
+        let upload_page_enabled = env::var("UPLOAD_PAGE_ENABLED")
+            .ok()
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(true);
+
+        let upload_password =
+            env::var("UPLOAD_PASSWORD").unwrap_or_else(|_| "changeme".to_string());
+
+        let use_filename_suffix = env::var("USE_FILENAME_SUFFIX")
+            .ok()
+            .map(|v| !v.eq_ignore_ascii_case("false"))
+            .unwrap_or(true);
+
+        let upload_debug_logs = env::var("UPLOAD_DEBUG_LOGS")
+            .ok()
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
         Ok(Self {
             address: address.parse().unwrap_or_else(|err| {
                 warn!(%err, "invalid ADDRESS value, falling back to default");
@@ -48,7 +76,20 @@ impl AppConfig {
             ttl,
             cleanup_interval,
             max_downloads,
+            url_prefix,
+            upload_page_enabled,
+            upload_password,
+            use_filename_suffix,
+            upload_debug_logs,
         })
+    }
+
+    pub fn build_download_url(&self, id: &str) -> String {
+        if let Some(prefix) = &self.url_prefix {
+            format!("{}/d/{}", prefix, id)
+        } else {
+            format!("/d/{}", id)
+        }
     }
 }
 
