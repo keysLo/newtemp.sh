@@ -1,8 +1,9 @@
 use std::{
     collections::HashMap,
     env,
+    io::ErrorKind,
     net::SocketAddr,
-    path::{Path, PathBuf},
+    path::{Path as FsPath, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -14,6 +15,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use dotenvy::dotenv;
 use serde::Serialize;
 use thiserror::Error;
 use tokio::{fs, sync::Mutex, time::interval};
@@ -46,15 +48,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("listening on {}", addr);
     axum::serve(listener, app).await?;
-    let addr: SocketAddr = env
-        .var("ADDRESS")
-        .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
-        .parse()?;
-
-    info!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
 
     Ok(())
 }
@@ -92,26 +85,23 @@ struct AppConfig {
 
 impl AppConfig {
     fn from_env() -> Result<Self, AppError> {
-        let storage_dir = env
-            .var("STORAGE_DIR")
-            .unwrap_or_else(|_| "data".to_string());
+        let storage_dir = env::var("STORAGE_DIR").unwrap_or_else(|_| "data".to_string());
 
-        let ttl = env
-            .var("DEFAULT_TTL_SECS")
+        let ttl = env::var("DEFAULT_TTL_MINS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
+            .map(|minutes| minutes.saturating_mul(60))
             .map(Duration::from_secs)
-            .unwrap_or_else(|| Duration::from_secs(3600));
+            .unwrap_or_else(|| Duration::from_secs(60 * 60));
 
-        let cleanup_interval = env
-            .var("CLEANUP_INTERVAL_SECS")
+        let cleanup_interval = env::var("CLEANUP_INTERVAL_MINS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
+            .map(|minutes| minutes.saturating_mul(60))
             .map(Duration::from_secs)
             .unwrap_or_else(|| Duration::from_secs(60));
 
-        let max_downloads = env
-            .var("MAX_DOWNLOADS")
+        let max_downloads = env::var("MAX_DOWNLOADS")
             .ok()
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(3);
@@ -161,7 +151,7 @@ impl IntoResponse for AppError {
 #[derive(Serialize)]
 struct UploadResponse {
     url: String,
-    expires_in_seconds: u64,
+    expires_in_minutes: u64,
     remaining_downloads: u32,
 }
 
@@ -198,7 +188,7 @@ async fn upload(
 
         let response = UploadResponse {
             url: format!("/d/{}", id),
-            expires_in_seconds: state.config.ttl.as_secs(),
+            expires_in_minutes: state.config.ttl.as_secs() / 60,
             remaining_downloads: state.config.max_downloads,
         };
 
@@ -260,6 +250,14 @@ async fn download(
     Ok((headers, body).into_response())
 }
 
+fn load_env_file() {
+    if let Err(err) = dotenv() {
+        if !matches!(err, dotenvy::Error::Io(ref io_err) if io_err.kind() == ErrorKind::NotFound) {
+            warn!(%err, "failed to load .env file");
+        }
+    }
+}
+
 fn spawn_cleanup(state: Arc<AppState>) {
     tokio::spawn(async move {
         let mut ticker = interval(state.config.cleanup_interval);
@@ -288,7 +286,7 @@ async fn purge_expired(state: &Arc<AppState>) {
     }
 }
 
-async fn delete_file(path: &Path) {
+async fn delete_file(path: &FsPath) {
     if let Err(err) = fs::remove_file(path).await {
         if err.kind() != std::io::ErrorKind::NotFound {
             warn!(%err, "failed to remove file {:?}", path);
