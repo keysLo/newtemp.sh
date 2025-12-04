@@ -290,19 +290,21 @@ async fn upload_page(State(state): State<Arc<AppState>>) -> Response {
     }
 
     let body = r#"<!doctype html>
-<html lang=\"en\">
+<html lang="en">
 <head>
-  <meta charset=\"utf-8\" />
+  <meta charset="utf-8" />
   <title>newtemp.sh upload</title>
   <style>
     :root {
       color-scheme: light dark;
-      --bg: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #0a66c2 100%);
+      --bg: radial-gradient(circle at 10% 20%, rgba(76, 110, 245, 0.45), transparent 25%),
+             radial-gradient(circle at 85% 10%, rgba(147, 51, 234, 0.35), transparent 28%),
+             linear-gradient(145deg, #0d1117 0%, #0f172a 40%, #0b1221 100%);
       --card: rgba(255, 255, 255, 0.08);
       --border: rgba(255, 255, 255, 0.18);
       --text: #f6f8fa;
       --muted: #c9d1d9;
-      --accent: #58a6ff;
+      --accent: #79c0ff;
     }
     * { box-sizing: border-box; }
     body {
@@ -317,71 +319,71 @@ async fn upload_page(State(state): State<Arc<AppState>>) -> Response {
       padding: 2.5rem 1.5rem;
     }
     .shell {
-      width: min(720px, 100%);
+      width: min(780px, 100%);
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 18px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      border-radius: 20px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
       backdrop-filter: blur(18px);
-      padding: 1.75rem 2rem;
+      padding: 2rem 2.25rem;
     }
-    header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
-    header h1 { margin: 0; font-size: 1.6rem; letter-spacing: 0.01em; }
-    header span { padding: 0.35rem 0.65rem; border-radius: 999px; background: rgba(88, 166, 255, 0.15); border: 1px solid var(--border); color: var(--accent); font-weight: 600; font-size: 0.85rem; }
-    p { color: var(--muted); margin: 0.25rem 0 1rem; }
-    form { margin-top: 1rem; display: grid; gap: 0.9rem; }
-    label { font-weight: 600; letter-spacing: 0.01em; }
-    input[type=\"password\"], input[type=\"file\"] {
+    header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+    header h1 { margin: 0; font-size: 1.75rem; letter-spacing: 0.01em; }
+    header span { padding: 0.35rem 0.7rem; border-radius: 999px; background: rgba(121, 192, 255, 0.12); border: 1px solid var(--border); color: var(--accent); font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    p { color: var(--muted); margin: 0.35rem 0 1.1rem; font-size: 1.02rem; }
+    form { margin-top: 1.2rem; display: grid; gap: 1rem; }
+    label { font-weight: 700; letter-spacing: 0.01em; display: inline-flex; align-items: center; gap: 0.4rem; }
+    input[type="password"], input[type="file"] {
       width: 100%;
       font-size: 1rem;
-      padding: 0.65rem 0.75rem;
+      padding: 0.75rem 0.85rem;
       border-radius: 12px;
       border: 1px solid var(--border);
       background: rgba(255, 255, 255, 0.06);
       color: var(--text);
     }
-    input[type=\"file\"] { padding: 0.5rem 0.75rem; }
-    .file-row { display: flex; gap: 0.6rem; align-items: center; }
-    #file-name { flex: 1; padding: 0.65rem 0.75rem; border-radius: 12px; background: rgba(255, 255, 255, 0.06); border: 1px dashed var(--border); color: var(--muted); min-height: 44px; display: flex; align-items: center; }
+    input[type="file"] { padding: 0.6rem 0.85rem; }
+    .file-row { display: flex; gap: 0.7rem; align-items: stretch; }
+    #file-name { flex: 1; padding: 0.7rem 0.85rem; border-radius: 12px; background: rgba(255, 255, 255, 0.06); border: 1px dashed var(--border); color: var(--muted); min-height: 48px; display: flex; align-items: center; }
     button {
       font-size: 1rem;
-      font-weight: 700;
-      padding: 0.75rem 1rem;
+      font-weight: 750;
+      padding: 0.85rem 1.1rem;
       border-radius: 12px;
       border: none;
       cursor: pointer;
       transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
     }
-    #file-button { background: rgba(88, 166, 255, 0.2); color: var(--accent); border: 1px solid var(--border); }
-    #submit { background: linear-gradient(120deg, #4096ff, #58a6ff); color: #0b1221; box-shadow: 0 14px 40px rgba(88, 166, 255, 0.35); }
+    #file-button { background: rgba(121, 192, 255, 0.18); color: var(--accent); border: 1px solid var(--border); }
+    #submit { background: linear-gradient(120deg, #4096ff, #6ec1ff); color: #0b1221; box-shadow: 0 14px 45px rgba(88, 166, 255, 0.4); }
     button:active { transform: translateY(1px); }
-    #result { margin-top: 1.25rem; }
-    pre { background: rgba(0, 0, 0, 0.35); padding: 0.85rem; border-radius: 12px; overflow: auto; border: 1px solid var(--border); }
+    #result { margin-top: 1.35rem; }
+    pre { background: rgba(0, 0, 0, 0.4); padding: 0.95rem; border-radius: 12px; overflow: auto; border: 1px solid var(--border); }
   </style>
 </head>
 <body>
-  <div class=\"shell\">
+  <div class="shell">
     <header>
       <h1>newtemp.sh uploader</h1>
       <span>Secure</span>
     </header>
     <p>Upload a file with the shared password to receive a download link instantly.</p>
-    <form id=\"upload-form\">
+    <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data">
       <div>
-        <label for=\"password\">Upload password</label>
-        <input id=\"password\" name=\"password\" type=\"password\" required placeholder=\"Enter the upload password\" />
+        <label for="password">Upload password</label>
+        <input id="password" name="password" type="password" required placeholder="Enter the upload password" />
       </div>
       <div>
-        <label for=\"file\">Choose a file</label>
-        <div class=\"file-row\">
-          <input id=\"file\" name=\"file\" type=\"file\" required />
-          <button type=\"button\" id=\"file-button\">Browse</button>
+        <label for="file">Choose a file</label>
+        <div class="file-row">
+          <input id="file" name="file" type="file" required />
+          <button type="button" id="file-button">Browse</button>
         </div>
-        <div id=\"file-name\">No file chosen yet</div>
+        <div id="file-name">No file chosen yet</div>
       </div>
-      <button type=\"submit\" id=\"submit\">Upload &amp; get link</button>
+      <button type="submit" id="submit">Upload &amp; get link</button>
     </form>
-    <div id=\"result\"></div>
+    <div id="result"></div>
   </div>
   <script>
     const form = document.getElementById('upload-form');
