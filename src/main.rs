@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     env,
     net::SocketAddr,
-    path::{Path as FsPath, PathBuf},
+    path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -46,6 +46,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("listening on {}", addr);
     axum::serve(listener, app).await?;
+    let addr: SocketAddr = env
+        .var("ADDRESS")
+        .unwrap_or_else(|_| "0.0.0.0:8080".to_string())
+        .parse()?;
+
+    info!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await?;
 
     Ok(())
 }
@@ -79,42 +88,39 @@ struct AppConfig {
     ttl: Duration,
     cleanup_interval: Duration,
     max_downloads: u32,
-    max_upload_bytes: u64,
 }
 
 impl AppConfig {
     fn from_env() -> Result<Self, AppError> {
-        let storage_dir = env::var("STORAGE_DIR").unwrap_or_else(|_| "data".to_string());
+        let storage_dir = env
+            .var("STORAGE_DIR")
+            .unwrap_or_else(|_| "data".to_string());
 
-        let ttl = env::var("DEFAULT_TTL_SECS")
+        let ttl = env
+            .var("DEFAULT_TTL_SECS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .map(Duration::from_secs)
             .unwrap_or_else(|| Duration::from_secs(3600));
 
-        let cleanup_interval = env::var("CLEANUP_INTERVAL_SECS")
+        let cleanup_interval = env
+            .var("CLEANUP_INTERVAL_SECS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .map(Duration::from_secs)
             .unwrap_or_else(|| Duration::from_secs(60));
 
-        let max_downloads = env::var("MAX_DOWNLOADS")
+        let max_downloads = env
+            .var("MAX_DOWNLOADS")
             .ok()
             .and_then(|v| v.parse::<u32>().ok())
             .unwrap_or(3);
-
-        let max_upload_bytes = env::var("MAX_UPLOAD_GB")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .map(|gb| gb.saturating_mul(1024 * 1024 * 1024))
-            .unwrap_or(1 * 1024 * 1024 * 1024);
 
         Ok(Self {
             storage_dir: PathBuf::from(storage_dir),
             ttl,
             cleanup_interval,
             max_downloads,
-            max_upload_bytes,
         })
     }
 }
@@ -125,8 +131,6 @@ enum AppError {
     NotFound,
     #[error("no file provided in multipart field 'file'")]
     NoFileProvided,
-    #[error("file too large, limit is {0} bytes")]
-    FileTooLarge(u64),
     #[error("multipart error: {0}")]
     Multipart(#[from] axum::extract::multipart::MultipartError),
     #[error("io error: {0}")]
@@ -140,11 +144,6 @@ impl IntoResponse for AppError {
             Self::NoFileProvided => (
                 StatusCode::BAD_REQUEST,
                 "expected multipart field named 'file'",
-            )
-                .into_response(),
-            Self::FileTooLarge(limit) => (
-                StatusCode::PAYLOAD_TOO_LARGE,
-                format!("file exceeds upload limit of {} bytes", limit),
             )
                 .into_response(),
             Self::Multipart(err) => {
@@ -184,11 +183,6 @@ async fn upload(
         let id = Uuid::new_v4().to_string();
         let path = state.config.storage_dir.join(&id);
         let data = field.bytes().await?;
-
-        if data.len() as u64 > state.config.max_upload_bytes {
-            return Err(AppError::FileTooLarge(state.config.max_upload_bytes));
-        }
-
         fs::write(&path, &data).await?;
 
         let expires_at = Instant::now() + state.config.ttl;
@@ -212,21 +206,6 @@ async fn upload(
     }
 
     Err(AppError::NoFileProvided)
-}
-
-fn load_env_file() {
-    let config_file = env::var("CONFIG_FILE").unwrap_or_else(|_| "config.env".to_string());
-
-    match dotenvy::from_filename(&config_file) {
-        Ok(_) => info!("loaded environment from {}", config_file),
-        Err(err) if err.not_found() => {
-            info!(
-                "no config file found at {}, using process environment",
-                config_file
-            )
-        }
-        Err(err) => warn!(%err, "failed to load config file {}", config_file),
-    }
 }
 
 async fn download(
@@ -309,7 +288,7 @@ async fn purge_expired(state: &Arc<AppState>) {
     }
 }
 
-async fn delete_file(path: &FsPath) {
+async fn delete_file(path: &Path) {
     if let Err(err) = fs::remove_file(path).await {
         if err.kind() != std::io::ErrorKind::NotFound {
             warn!(%err, "failed to remove file {:?}", path);

@@ -16,6 +16,13 @@ CLEANUP_INTERVAL_SECS=60      # 清理过期文件的周期（秒）
 MAX_DOWNLOADS=3               # 每个链接最大访问次数（默认 3）
 MAX_UPLOAD_GB=1               # 最大上传文件大小（GB，默认 1GB）
 ENV
+```bash
+# 可选：配置环境变量
+export ADDRESS=0.0.0.0:8080          # 监听地址（默认 0.0.0.0:8080）
+export STORAGE_DIR=./data            # 文件存储目录（默认 ./data）
+export DEFAULT_TTL_SECS=3600         # 链接与文件默认保留时长（秒）
+export CLEANUP_INTERVAL_SECS=60      # 清理过期文件的周期（秒）
+export MAX_DOWNLOADS=3               # 每个链接最大访问次数（默认 3）
 
 cargo run
 ```
