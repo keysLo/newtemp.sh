@@ -97,16 +97,18 @@ impl AppConfig {
             .unwrap_or_else(|_| "data".to_string());
 
         let ttl = env
-            .var("DEFAULT_TTL_SECS")
+            .var("DEFAULT_TTL_MINS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
+            .map(|minutes| minutes.saturating_mul(60))
             .map(Duration::from_secs)
-            .unwrap_or_else(|| Duration::from_secs(3600));
+            .unwrap_or_else(|| Duration::from_secs(60 * 60));
 
         let cleanup_interval = env
-            .var("CLEANUP_INTERVAL_SECS")
+            .var("CLEANUP_INTERVAL_MINS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
+            .map(|minutes| minutes.saturating_mul(60))
             .map(Duration::from_secs)
             .unwrap_or_else(|| Duration::from_secs(60));
 
@@ -161,7 +163,7 @@ impl IntoResponse for AppError {
 #[derive(Serialize)]
 struct UploadResponse {
     url: String,
-    expires_in_seconds: u64,
+    expires_in_minutes: u64,
     remaining_downloads: u32,
 }
 
@@ -198,7 +200,7 @@ async fn upload(
 
         let response = UploadResponse {
             url: format!("/d/{}", id),
-            expires_in_seconds: state.config.ttl.as_secs(),
+            expires_in_minutes: state.config.ttl.as_secs() / 60,
             remaining_downloads: state.config.max_downloads,
         };
 
