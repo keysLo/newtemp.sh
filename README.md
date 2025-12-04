@@ -15,8 +15,6 @@ DEFAULT_TTL_MINS=60           # 链接与文件默认保留时长（分钟）
 CLEANUP_INTERVAL_MINS=1       # 清理过期文件的周期（分钟）
 MAX_DOWNLOADS=3               # 每个链接最大访问次数（默认 3）
 URL_PREFIX=                   # （可选）自定义完整链接前缀，例如 https://google.com:123
-UPLOAD_PAGE_ENABLED=true      # （默认 true）是否启用内置上传页面
-UPLOAD_PASSWORD=changeme      # 上传密码（上传页面与 /upload 接口均需携带）
 MAX_UPLOAD_GB=1               # 最大上传文件大小（GB，默认 1GB）
 ENV
 ```bash
@@ -27,8 +25,6 @@ export DEFAULT_TTL_MINS=60           # 链接与文件默认保留时长（分�
 export CLEANUP_INTERVAL_MINS=1       # 清理过期文件的周期（分钟）
 export MAX_DOWNLOADS=3               # 每个链接最大访问次数（默认 3）
 export URL_PREFIX=                   # （可选）自定义完整链接前缀，例如 https://google.com:123
-export UPLOAD_PAGE_ENABLED=true      # （默认 true）是否启用内置上传页面
-export UPLOAD_PASSWORD=changeme      # 上传密码（上传页面与 /upload 接口均需携带）
 
 cargo run
 ```
