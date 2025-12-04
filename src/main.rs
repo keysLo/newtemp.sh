@@ -87,14 +87,16 @@ impl AppConfig {
     fn from_env() -> Result<Self, AppError> {
         let storage_dir = env::var("STORAGE_DIR").unwrap_or_else(|_| "data".to_string());
 
-        let ttl = env::var("DEFAULT_TTL_MINS")
+        let ttl = env
+            .var("DEFAULT_TTL_MINS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .map(|minutes| minutes.saturating_mul(60))
             .map(Duration::from_secs)
             .unwrap_or_else(|| Duration::from_secs(60 * 60));
 
-        let cleanup_interval = env::var("CLEANUP_INTERVAL_MINS")
+        let cleanup_interval = env
+            .var("CLEANUP_INTERVAL_MINS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
             .map(|minutes| minutes.saturating_mul(60))
