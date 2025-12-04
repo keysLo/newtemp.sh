@@ -290,50 +290,63 @@ async fn upload_page(State(state): State<Arc<AppState>>) -> Response {
     }
 
     let body = r#"<!doctype html>
-<html lang=\"zh-CN\">
+<html lang=\"en\">
 <head>
   <meta charset=\"utf-8\" />
-  <title>newtemp.sh 上传</title>
+  <title>newtemp.sh upload</title>
   <style>
     body { font-family: sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
     label { display: block; margin: 0.5rem 0 0.25rem; }
-    input, button { font-size: 1rem; padding: 0.4rem 0.6rem; width: 100%; box-sizing: border-box; }
-    button { margin-top: 1rem; }
+    input[type=\"password\"], button { font-size: 1rem; padding: 0.4rem 0.6rem; width: 100%; box-sizing: border-box; }
+    button { margin-top: 0.75rem; }
+    #file { display: none; }
+    #file-name { display: block; margin-top: 0.25rem; color: #555; word-break: break-all; }
     pre { background: #f5f5f5; padding: 0.75rem; overflow: auto; }
   </style>
 </head>
 <body>
-  <h1>上传文件</h1>
-  <p>请选择文件并输入上传密码后提交，成功后会返回下载链接。</p>
+  <h1>Upload a file</h1>
+  <p>Select a file and enter the upload password to receive a download link.</p>
   <form id=\"upload-form\">
-    <label for=\"password\">上传密码</label>
-    <input id=\"password\" name=\"password\" type=\"password\" required placeholder=\"请填写上传密码\" />
-    <label for=\"file\">选择文件</label>
+    <label for=\"password\">Upload password</label>
+    <input id=\"password\" name=\"password\" type=\"password\" required placeholder=\"Enter the upload password\" />
+    <label for=\"file\">Select file</label>
     <input id=\"file\" name=\"file\" type=\"file\" required />
-    <button type=\"submit\">上传</button>
+    <button type=\"button\" id=\"file-button\">Choose file</button>
+    <span id=\"file-name\">No file chosen</span>
+    <button type=\"submit\">Upload</button>
   </form>
   <div id=\"result\"></div>
   <script>
     const form = document.getElementById('upload-form');
     const result = document.getElementById('result');
+    const fileInput = document.getElementById('file');
+    const fileButton = document.getElementById('file-button');
+    const fileName = document.getElementById('file-name');
+
+    fileButton.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      fileName.textContent = fileInput.files[0]?.name || 'No file chosen';
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const file = document.getElementById('file').files[0];
+      const file = fileInput.files[0];
       const password = document.getElementById('password').value;
       if (!file) {
-        result.textContent = '请先选择文件';
+        result.textContent = 'Please choose a file first';
         return;
       }
       const data = new FormData();
       data.append('password', password);
       data.append('file', file);
-      result.textContent = '上传中...';
+      result.textContent = 'Uploading...';
       try {
         const response = await fetch('/upload', { method: 'POST', body: data });
         const text = await response.text();
         result.innerHTML = '<pre>' + text + '</pre>';
       } catch (err) {
-        result.textContent = '上传失败: ' + err;
+        result.textContent = 'Upload failed: ' + err;
       }
     });
   </script>
