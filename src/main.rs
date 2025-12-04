@@ -143,35 +143,10 @@ async fn upload(
         }
     }
 
-        let filename = field
-            .file_name()
-            .map(|v| v.to_string())
-            .unwrap_or_else(|| "upload.bin".to_string());
-        let content_type = field.content_type().map(|v| v.to_string());
-
-        let id = Uuid::new_v4().to_string();
-        let path = state.config.storage_dir.join(&id);
-        let data = field.bytes().await?;
-        fs::write(&path, &data).await?;
-
-        let expires_at = Instant::now() + state.config.ttl;
-        let entry = FileEntry {
-            path: path.clone(),
-            filename,
-            expires_at,
-            remaining_hits: state.config.max_downloads,
-            content_type,
-        };
-
-        state.entries.lock().await.insert(id.clone(), entry);
-
-        let response = UploadResponse {
-            url: state.config.build_download_url(&id),
-            expires_in_minutes: state.config.ttl.as_secs() / 60,
-            remaining_downloads: state.config.max_downloads,
-        };
-
-        return Ok(Json(response));
+    if state.config.upload_page_enabled
+        && state.config.upload_password != provided_password.as_deref().unwrap_or("")
+    {
+        return Err(AppError::Unauthorized);
     }
 
     let Some((filename, content_type, data)) = file_data else {
@@ -179,7 +154,22 @@ async fn upload(
     };
 
     let id = Uuid::new_v4().to_string();
-    let path = state.config.storage_dir.join(&id);
+    let suffix = if state.config.use_filename_suffix {
+        FsPath::new(&filename)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .filter(|ext| !ext.is_empty())
+            .map(|ext| format!(".{}", ext))
+    } else {
+        None
+    };
+
+    let download_id = suffix
+        .as_deref()
+        .map(|ext| format!("{}{}", id, ext))
+        .unwrap_or_else(|| id.clone());
+
+    let path = state.config.storage_dir.join(&download_id);
     fs::write(&path, &data).await?;
 
     let expires_at = Instant::now() + state.config.ttl;
@@ -191,10 +181,14 @@ async fn upload(
         content_type,
     };
 
-    state.entries.lock().await.insert(id.clone(), entry);
+    state
+        .entries
+        .lock()
+        .await
+        .insert(download_id.clone(), entry);
 
     let response = UploadResponse {
-        url: state.config.build_download_url(&id),
+        url: state.config.build_download_url(&download_id),
         expires_in_minutes: state.config.ttl.as_secs() / 60,
         remaining_downloads: state.config.max_downloads,
     };

@@ -15,6 +15,9 @@ DEFAULT_TTL_MINS=60           # 链接与文件默认保留时长（分钟）
 CLEANUP_INTERVAL_MINS=1       # 清理过期文件的周期（分钟）
 MAX_DOWNLOADS=3               # 每个链接最大访问次数（默认 3）
 URL_PREFIX=                   # （可选）自定义完整链接前缀，例如 https://google.com:123
+UPLOAD_PAGE_ENABLED=true      # （默认 true）是否启用内置上传页面
+UPLOAD_PASSWORD=changeme      # 上传密码（上传页面与 /upload 接口均需携带）
+USE_FILENAME_SUFFIX=true      # （默认 true）下载链接是否携带源文件后缀（如 .png），设为 false 可禁用
 MAX_UPLOAD_GB=1               # 最大上传文件大小（GB，默认 1GB）
 ENV
 ```bash
@@ -25,6 +28,9 @@ export DEFAULT_TTL_MINS=60           # 链接与文件默认保留时长（分�
 export CLEANUP_INTERVAL_MINS=1       # 清理过期文件的周期（分钟）
 export MAX_DOWNLOADS=3               # 每个链接最大访问次数（默认 3）
 export URL_PREFIX=                   # （可选）自定义完整链接前缀，例如 https://google.com:123
+export UPLOAD_PAGE_ENABLED=true      # （默认 true）是否启用内置上传页面
+export UPLOAD_PASSWORD=changeme      # 上传密码（上传页面与 /upload 接口均需携带）
+export USE_FILENAME_SUFFIX=true      # （默认 true）下载链接是否携带源文件后缀（如 .png），设为 false 可禁用
 
 cargo run
 ```
@@ -43,7 +49,7 @@ curl -F "password=changeme" -F "file=@/path/to/file" http://localhost:8080/uploa
 
 ```json
 {
-  "url": "https://google.com:123/d/2d017dd9-7f7f-4f94-8a9a-21d3fdd7c2f3",
+  "url": "https://google.com:123/d/2d017dd9-7f7f-4f94-8a9a-21d3fdd7c2f3.png",
   "expires_in_minutes": 60,
   "remaining_downloads": 3
 }
@@ -52,7 +58,7 @@ curl -F "password=changeme" -F "file=@/path/to/file" http://localhost:8080/uploa
 使用返回的 `url` 下载文件（最多 3 次，超过次数或过期后文件与链接都会删除）：
 
 ```bash
-curl -O http://localhost:8080/d/2d017dd9-7f7f-4f94-8a9a-21d3fdd7c2f3
+curl -O http://localhost:8080/d/2d017dd9-7f7f-4f94-8a9a-21d3fdd7c2f3.png
 ```
 
 服务会自动在后台周期性清理过期的文件与记录。

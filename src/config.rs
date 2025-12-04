@@ -13,6 +13,9 @@ pub struct AppConfig {
     pub cleanup_interval: Duration,
     pub max_downloads: u32,
     pub url_prefix: Option<String>,
+    pub upload_page_enabled: bool,
+    pub upload_password: String,
+    pub use_filename_suffix: bool,
 }
 
 impl AppConfig {
@@ -45,6 +48,19 @@ impl AppConfig {
             .map(|prefix| prefix.trim_end_matches('/').to_string())
             .filter(|prefix| !prefix.is_empty());
 
+        let upload_page_enabled = env::var("UPLOAD_PAGE_ENABLED")
+            .ok()
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(true);
+
+        let upload_password =
+            env::var("UPLOAD_PASSWORD").unwrap_or_else(|_| "changeme".to_string());
+
+        let use_filename_suffix = env::var("USE_FILENAME_SUFFIX")
+            .ok()
+            .map(|v| !v.eq_ignore_ascii_case("false"))
+            .unwrap_or(true);
+
         Ok(Self {
             address: address.parse().unwrap_or_else(|err| {
                 warn!(%err, "invalid ADDRESS value, falling back to default");
@@ -55,6 +71,9 @@ impl AppConfig {
             cleanup_interval,
             max_downloads,
             url_prefix,
+            upload_page_enabled,
+            upload_password,
+            use_filename_suffix,
         })
     }
 
