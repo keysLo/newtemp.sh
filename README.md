@@ -52,3 +52,7 @@ curl -O http://localhost:8080/d/2d017dd9-7f7f-4f94-8a9a-21d3fdd7c2f3
 ```
 
 服务会自动在后台周期性清理过期的文件与记录。
+
+## GitHub 合并冲突小贴士
+
+如果在 GitHub 网页端合并时看到 `Accept current change / Accept incoming change / Accept both changes`，请选 **Accept incoming change** 以保留此仓库当前分支的完整实现。
