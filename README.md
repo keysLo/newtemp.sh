@@ -14,6 +14,7 @@ STORAGE_DIR=./data            # 文件存储目录（默认 ./data）
 DEFAULT_TTL_MINS=60           # 链接与文件默认保留时长（分钟）
 CLEANUP_INTERVAL_MINS=1       # 清理过期文件的周期（分钟）
 MAX_DOWNLOADS=3               # 每个链接最大访问次数（默认 3）
+URL_PREFIX=                   # （可选）自定义完整链接前缀，例如 https://google.com:123
 MAX_UPLOAD_GB=1               # 最大上传文件大小（GB，默认 1GB）
 ENV
 ```bash
@@ -23,6 +24,7 @@ export STORAGE_DIR=./data            # 文件存储目录（默认 ./data）
 export DEFAULT_TTL_MINS=60           # 链接与文件默认保留时长（分钟）
 export CLEANUP_INTERVAL_MINS=1       # 清理过期文件的周期（分钟）
 export MAX_DOWNLOADS=3               # 每个链接最大访问次数（默认 3）
+export URL_PREFIX=                   # （可选）自定义完整链接前缀，例如 https://google.com:123
 
 cargo run
 ```
@@ -39,7 +41,7 @@ curl -F "file=@/path/to/file" http://localhost:8080/upload
 
 ```json
 {
-  "url": "/d/2d017dd9-7f7f-4f94-8a9a-21d3fdd7c2f3",
+  "url": "https://google.com:123/d/2d017dd9-7f7f-4f94-8a9a-21d3fdd7c2f3",
   "expires_in_minutes": 60,
   "remaining_downloads": 3
 }
@@ -52,7 +54,3 @@ curl -O http://localhost:8080/d/2d017dd9-7f7f-4f94-8a9a-21d3fdd7c2f3
 ```
 
 服务会自动在后台周期性清理过期的文件与记录。
-
-## GitHub 合并冲突小贴士
-
-如果在 GitHub 网页端合并时看到 `Accept current change / Accept incoming change / Accept both changes`，请选 **Accept incoming change** 以保留此仓库当前分支的完整实现。

@@ -143,7 +143,7 @@ async fn upload(
         state.entries.lock().await.insert(id.clone(), entry);
 
         let response = UploadResponse {
-            url: format!("/d/{}", id),
+            url: state.config.build_download_url(&id),
             expires_in_minutes: state.config.ttl.as_secs() / 60,
             remaining_downloads: state.config.max_downloads,
         };
